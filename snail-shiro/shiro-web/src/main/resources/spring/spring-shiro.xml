@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:aop="http://www.springframework.org/schema/aop"
+       xmlns:util="http://www.springframework.org/schema/util"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans
+       http://www.springframework.org/schema/beans/spring-beans.xsd
+        http://www.springframework.org/schema/aop
+     	http://www.springframework.org/schema/aop/spring-aop-4.2.xsd
+        http://www.springframework.org/schema/util
+        http://www.springframework.org/schema/util/spring-util-4.1.xsd">
+
+    <bean id="customRealm" class="com.snail.shiro.realm.CustomRealm"></bean>
+
+     <!-- 自定义 SessionDao -->
+    <bean id="redisSessionDao" class="com.snail.shiro.session.RedisSessionDao"/>
+    <!-- 自定义 SessionManager -->
+    <bean id="sessionManager" class="com.snail.shiro.session.CustomSessionManager">
+        <property name="sessionDAO" ref="redisSessionDao"/>
+    </bean>
+
+    <!-- 自定义 CacheManager  -->
+    <bean id="cacheManager" class="com.snail.shiro.cache.RedisCacheManager"/>
+
+    <!--这里一定是 DefaultWebSecurityManager，不然会报错-->
+    <bean id="securityManager" class="org.apache.shiro.web.mgt.DefaultWebSecurityManager">
+        <property name="realm" ref="customRealm"/>
+        <property name="sessionManager" ref="sessionManager"/>
+        <property name="cacheManager" ref="cacheManager"/>
+        <property name="rememberMeManager" ref="cookieRememberMeManager"/>
+    </bean>
+
+    <bean id="shiroFilter" class="org.apache.shiro.spring.web.ShiroFilterFactoryBean">
+        <property name="securityManager" ref="securityManager"/>
+        <property name="loginUrl" value="login.html"/>
+        <property name="unauthorizedUrl" value="/"/>
+        <property name="filterChainDefinitions">
+            <value>
+                /login.html = anon
+                /loginAuth = anon
+                /testFilter = roles["admin","user"]
+                /testCustomFilter = rolesOr["admin","user"]
+                /* = authc
+            </value>
+        </property>
+        <property name="filters">
+            <util:map>
+                <!--配置自定义过滤器-->
+                <entry key="rolesOr" value-ref="rolesOrFilter" />
+            </util:map>
+        </property>
+    </bean>
+
+    <!--自定义过滤器-->
+    <bean id="rolesOrFilter" class="com.snail.shiro.filter.RolesOrFilter"/>
+
+    <!--shrio 注解配置权限-->
+    <aop:config proxy-target-class="true"/>
+    <bean class="org.apache.shiro.spring.LifecycleBeanPostProcessor"/>
+    <bean class="org.apache.shiro.spring.security.interceptor.AuthorizationAttributeSourceAdvisor">
+        <property name="securityManager" ref="securityManager"/>
+    </bean>
+
+    <!--Shiro RememberMe 即 "记住我" 的实现-->
+    <bean id="cookie" class="org.apache.shiro.web.servlet.SimpleCookie">
+        <constructor-arg value="rememberMe"/>
+        <property name="maxAge" value="200000"/>
+    </bean>
+    <bean id="cookieRememberMeManager" class="org.apache.shiro.web.mgt.CookieRememberMeManager">
+        <property name="cookie" ref="cookie"/>
+    </bean>
+
+</beans>
